@@ -1,0 +1,16 @@
+{
+  "name": "det",
+  "version": "1.0.0",
+  "description": "Degree English Test",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "parse5": "^6.0.0",
+    "puppeteer": "^3.3.0",
+    "puppeteer-core": "^3.3.0"
+  }
+}
