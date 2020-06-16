@@ -4,7 +4,10 @@ const util = require("./util");
 const fs = require("fs");
 const path = require("path");
 let path_testparper = path.resolve(__dirname,"./testparper")
-
+let DB = require("../db/DB");
+let db = new DB({
+  dbfile:path.join(__dirname,"../db/testpaper.db")
+})
 if(!util.isexits(path_testparper)){
   let createpath = fs.mkdirSync(path_testparper,{
     recursive:true
@@ -41,7 +44,23 @@ if(!util.isexits(path_testparper)){
     testParper.contents = testParperLins;
     fs.writeFileSync(testParperFilePath,JSON.stringify(testParper.contents,null,2))
   }
-
+  console.log(testParper.contents);
+  let topics = [];
+  let topicIndex = 0;
+  for(let i = 0;i < testParper.contents.length;i++){
+    let info = {
+      title:"",
+      options:[]
+    };
+    let item = testParper.contents[i];
+    if(/^[1-9]\./.test(item)){
+      topicIndex = i;
+      info.title = item;
+    }else if(/^[A-Z]\./.test(item)){
+      info.options.push(item);
+    }
+  }
+  // db.insert("insert into testpaper_topic(topic_content,topic_type) value (?,?)",[])
   await browser.close();
 })()
 
