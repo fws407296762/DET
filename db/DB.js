@@ -17,19 +17,24 @@ class DB{
       })
     })
   }
-  insert(sql,objects){
+  sql(sql, param, mode) {
     let _self = this;
-    return new Promise((resolve,reject)=>{
-      console.log(_self.db)
-      _self.db.serialize(function(){
-        let stmt = _self.db.prepare(sql);
-        for(let i = 0;i<objects.length;i++){
-          stmt.run(objects[i])
+    mode = mode == 'all' ? 'all' : mode == 'get' ? 'get' : 'run';
+    return new Promise((resolve, reject) => {
+      _self.db[mode](sql, param,
+        function (err, data) {    // data: Array, Object
+          if (err) {
+            reject(new Error(err));
+          } else {
+            if (data) {
+              resolve(data);    // 返回数据查询成功的结果
+            } else {
+              resolve('success');    // 提示 增 删 改 操作成功
+            };
+          };
         }
-        stmt.finalize();
-        resolve();
-      })
-    })
+      );
+    });
   }
 };
 

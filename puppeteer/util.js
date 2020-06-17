@@ -1,5 +1,5 @@
 const puppeteer = require("puppeteer");
-
+const fs = require("fs");
 
 // 启动浏览器
 async function lanuch(url,fn){

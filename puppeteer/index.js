@@ -44,23 +44,79 @@ if(!util.isexits(path_testparper)){
     testParper.contents = testParperLins;
     fs.writeFileSync(testParperFilePath,JSON.stringify(testParper.contents,null,2))
   }
-  console.log(testParper.contents);
-  let topics = [];
-  let topicIndex = 0;
-  for(let i = 0;i < testParper.contents.length;i++){
-    let info = {
+
+
+
+  function getformatterTopic(data){
+    let topicNumReg = /^[1-9][0-9]*/,
+      topicOptionsReg = /^[A-Z]\.\s*/,
+      topicPartReg = /^(Part)\s*[I,II,III,IV,V]\s*/,
+      topicDirectionsReg = /^(Directions)\s*\:\s*/,
+      topicAnswerReg = /^(【答案】)\s*/,
+      topicAnalyzeReg = /^(【解析】)\s*/;
+    let formatterTopic = [];
+    let topic = {
       title:"",
-      options:[]
-    };
-    let item = testParper.contents[i];
-    if(/^[1-9]\./.test(item)){
-      topicIndex = i;
-      info.title = item;
-    }else if(/^[A-Z]\./.test(item)){
-      info.options.push(item);
+      options:[],
+      answer:"",
+      analyze:""
     }
+    let optionsMap = {
+      "A":0,
+      "B":1,
+      "C":2,
+      "D":3
+    }
+    for(let i = 0;i<data.length;i++){
+      let item = data[i];
+      if(topicNumReg.test(item)){
+        let options = item.split(/[A-D]\.\s*/g);
+        options = options.splice(1);
+        if(options.length){
+          topic.title = "Please select the correct one"
+          topic.options = topic.options.concat(options);
+        }else{
+          topic.title = item;
+        }
+      }else if(topicOptionsReg.test(item)){
+        let options = item.split(/[A-D]\.\s*/g);
+        options = options.splice(1);
+        topic.options = topic.options.concat(options);
+      }else if(topicPartReg.test(item)){
+        continue;
+      }else if(topicDirectionsReg.test(item)){
+        continue;
+      }else if(topicAnswerReg.test(item)){
+        item = item.replace(topicAnswerReg,"");
+        topic.answer = optionsMap[item]
+      }else if(topicAnalyzeReg.test(item)){
+        topic.analyze = item.replace(topicAnalyzeReg,"")
+        formatterTopic.push(topic);
+        topic = {
+          title:"",
+          options:[],
+          answer:"",
+          analyze:""
+        }
+      }else{
+        topic.title += "\n" + item;
+      }
+    }
+    return formatterTopic;
   }
-  // db.insert("insert into testpaper_topic(topic_content,topic_type) value (?,?)",[])
+  let formatterTopic = getformatterTopic(testParper.contents)
+  console.log("formatterTopic:",formatterTopic)
+  db.db.serialize(function(){
+    for(let i = 0;i< formatterTopic.length;i++){
+      let topic = formatterTopic[i];
+      db.sql("insert into testpaper_topic(topic_content,topic_type) values (?,?)",[topic.title,1],"run").then((row)=>{
+        console.log("row:",row)
+      })
+    }
+  })
+
+
+
   await browser.close();
 })()
 
