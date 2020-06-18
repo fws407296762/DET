@@ -20,12 +20,15 @@ if(!util.isexits(path_testparper)){
   await page.goto("http://www.studyez.com/xueweiyingyu/lnst/all/201805/2714590.htm");
   let testParper = {
     title:"",
-    contents:[]
+    contents:[],
+    year:""
   }
   let testParperTitle = await page.$eval(".kao_h3",(ele)=>{
     return ele.textContent
   });
   testParper.title = testParperTitle;
+  let yearIndex = testParperTitle.search(/\d*/g);
+  testParper.year = testParperTitle.match(/\d*/g)[yearIndex]
   let testParperFilePath = path.resolve(path_testparper,"./"+testParper.title+".json")
   if(util.isexits(testParperFilePath)){
     testParper.contents = require(testParperFilePath);
@@ -45,21 +48,24 @@ if(!util.isexits(path_testparper)){
     fs.writeFileSync(testParperFilePath,JSON.stringify(testParper.contents,null,2))
   }
 
-
-
-  function getformatterTopic(data){
+  function getformatterTopic(data,year){
     let topicNumReg = /^[1-9][0-9]*/,
       topicOptionsReg = /^[A-Z]\.\s*/,
       topicPartReg = /^(Part)\s*[I,II,III,IV,V]\s*/,
       topicDirectionsReg = /^(Directions)\s*\:\s*/,
       topicAnswerReg = /^(【答案】)\s*/,
-      topicAnalyzeReg = /^(【解析】)\s*/;
+      topicAnalyzeReg = /^(【解析】)\s*/,
+      topicPassageReg = /^(Passage)\s*/;
     let formatterTopic = [];
     let topic = {
       title:"",
       options:[],
       answer:"",
-      analyze:""
+      analyze:"",
+      passage:"",
+      passagenum:"",
+      testpaperyear:"",
+      num:""
     }
     let optionsMap = {
       "A":0,
@@ -72,6 +78,9 @@ if(!util.isexits(path_testparper)){
       if(topicNumReg.test(item)){
         let options = item.split(/[A-D]\.\s*/g);
         options = options.splice(1);
+        let num = item.match(topicNumReg);
+        item = item.replace(topicNumReg,"");
+        topic.num = parseInt(num[0]);
         if(options.length){
           topic.title = "Please select the correct one"
           topic.options = topic.options.concat(options);
@@ -96,24 +105,35 @@ if(!util.isexits(path_testparper)){
           title:"",
           options:[],
           answer:"",
-          analyze:""
+          analyze:"",
+          passage:"",
+          passagenum:"",
+          num:""
         }
+      }else if(topicPassageReg.test(item)){
+        topic.passage = item;
       }else{
         topic.title += "\n" + item;
+        topic.passage += "\n" + item;
       }
     }
     return formatterTopic;
   }
   let formatterTopic = getformatterTopic(testParper.contents)
-  console.log("formatterTopic:",formatterTopic)
-  db.db.serialize(function(){
-    for(let i = 0;i< formatterTopic.length;i++){
-      let topic = formatterTopic[i];
-      db.sql("insert into testpaper_topic(topic_content,topic_type) values (?,?)",[topic.title,1],"run").then((row)=>{
-        console.log("row:",row)
-      })
-    }
-  })
+  let topicIndex = 0;
+ function inserttopicandanswer(topicIndex){
+   if(topicIndex === formatterTopic.length){
+     return false;
+   }
+   let topic = formatterTopic[topicIndex];
+   db.sql(
+     "insert into testpaper_topic(topic_content,topic_type,testpaper_year,testpaper_title,topic_options,topic_answer,topic_analyze,topic_num) values (?,?,?,?,?,?,?,?)",[topic.title,1,testParper.year,testParper.title,topic.options.join("[---]"),topic.answer,topic.analyze,topic.num],"all").then((row)=>{
+     topicIndex++;
+     inserttopicandanswer(topicIndex);
+   })
+ }
+
+  inserttopicandanswer(topicIndex)
 
 
 
