@@ -3,11 +3,11 @@ const parse5 = require("parse5");
 const util = require("./util");
 const fs = require("fs");
 const path = require("path");
+const sqlite3 = require("sqlite3");
+const sqlite = require("sqlite");
+
 let path_testparper = path.resolve(__dirname,"./testparper")
-let DB = require("../db/DB");
-let db = new DB({
-  dbfile:path.join(__dirname,"../db/testpaper.db")
-})
+
 if(!util.isexits(path_testparper)){
   let createpath = fs.mkdirSync(path_testparper,{
     recursive:true
@@ -15,6 +15,10 @@ if(!util.isexits(path_testparper)){
 }
 
 (async function load(){
+  const db = await sqlite.open({
+    filename:path.join(__dirname,"../db/testpaper.db"),
+    driver:sqlite3.Database
+  })
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   await page.goto("http://www.studyez.com/xueweiyingyu/lnst/all/201805/2714590.htm");
@@ -28,7 +32,8 @@ if(!util.isexits(path_testparper)){
   });
   testParper.title = testParperTitle;
   let yearIndex = testParperTitle.search(/\d*/g);
-  testParper.year = testParperTitle.match(/\d*/g)[yearIndex]
+  testParper.year = testParperTitle.match(/\d*/g)[yearIndex];
+
   let testParperFilePath = path.resolve(path_testparper,"./"+testParper.title+".json")
   if(util.isexits(testParperFilePath)){
     testParper.contents = require(testParperFilePath);
@@ -106,7 +111,6 @@ if(!util.isexits(path_testparper)){
           options:[],
           answer:"",
           analyze:"",
-          passage:"",
           passagenum:"",
           num:""
         }
@@ -119,24 +123,30 @@ if(!util.isexits(path_testparper)){
     }
     return formatterTopic;
   }
-  let formatterTopic = getformatterTopic(testParper.contents)
+  let formatterTopic = getformatterTopic(testParper.contents);
+  console.log(formatterTopic);
   let topicIndex = 0;
- function inserttopicandanswer(topicIndex){
-   if(topicIndex === formatterTopic.length){
-     return false;
-   }
-   let topic = formatterTopic[topicIndex];
-   db.sql(
-     "insert into testpaper_topic(topic_content,topic_type,testpaper_year,testpaper_title,topic_options,topic_answer,topic_analyze,topic_num) values (?,?,?,?,?,?,?,?)",[topic.title,1,testParper.year,testParper.title,topic.options.join("[---]"),topic.answer,topic.analyze,topic.num],"all").then((row)=>{
-     topicIndex++;
-     inserttopicandanswer(topicIndex);
-   })
- }
+  async function inserttopicandanswer(topicIndex){
+    if(topicIndex === formatterTopic.length){
+      return false;
+    }
+    let topic = formatterTopic[topicIndex];
+    let reading_id;
 
-  inserttopicandanswer(topicIndex)
+    await db.run("insert into topic(topic_content,topic_type,topic_options,topic_answer,topic_analyze,topic_num,reading_id) values (?,?,?,?,?,?,?,?)",[topic.title,1,testParper.year,testParper.title,topic.options.join("[---]"),topic.answer,topic.analyze,topic.num,reading_id])
+    // topicIndex++;
+    //   inserttopicandanswer(topicIndex);
+  }
 
 
 
+  // let lastTestpaper = await db.run("insert into testpaper(testpaper_subject,testpaper_time) values (:subject,:time)",{
+  //   ":subject":testParper.title,
+  //   ":time":testParper.year
+  // })
+
+
+  // await inserttopicandanswer(topicIndex)
   await browser.close();
 })()
 
