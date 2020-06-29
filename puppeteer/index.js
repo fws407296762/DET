@@ -33,7 +33,10 @@ if(!util.isexits(path_testparper)){
   testParper.title = testParperTitle;
   let yearIndex = testParperTitle.search(/\d*/g);
   testParper.year = testParperTitle.match(/\d*/g)[yearIndex];
-
+  let testpaperResult = await db.run("insert into testpaper(testpaper_subject,testpaper_time) values (:subject,:year)",{
+    ":subject":testParper.title,
+    ":year":testParper.year
+  });
   let testParperFilePath = path.resolve(path_testparper,"./"+testParper.title+".json")
   if(util.isexits(testParperFilePath)){
     testParper.contents = require(testParperFilePath);
@@ -53,7 +56,7 @@ if(!util.isexits(path_testparper)){
     fs.writeFileSync(testParperFilePath,JSON.stringify(testParper.contents,null,2))
   }
 
-  function getformatterTopic(data,year){
+  async function getformatterTopic(data,year){
     let topicNumReg = /^[1-9][0-9]*/,
       topicOptionsReg = /^[A-Z]\.\s*/,
       topicPartReg = /^(Part)\s*[I,II,III,IV,V]\s*/,
@@ -69,18 +72,39 @@ if(!util.isexits(path_testparper)){
       analyze:"",
       passage:"",
       passagenum:"",
-      testpaperyear:"",
-      num:""
+      testpaperyear:testpaperResult.lastID,
+      num:"",
+      readingid:""
     }
     let optionsMap = {
       "A":0,
       "B":1,
       "C":2,
       "D":3
+    };
+    let ennumMap = {
+      "one":1,
+      "two":2,
+      "three":3,
+      "four":4,
+      "five":5
     }
-    for(let i = 0;i<data.length;i++){
+    let di = 0;
+    await (async function mapData(i){
+      if(i === data.length)return false;
       let item = data[i];
+      let passageResult;
       if(topicNumReg.test(item)){
+        if(topic.passage){
+          let ennum = topic.passage.match(/^(Passage)\s*(\w*)/)[2];
+          ennum = ennum.toLowerCase();
+          passageResult = await db.run("insert into topic_reading(reading_num,reading_content,testpaper_id) values (:num,:content,:id)",{
+            ":num":ennumMap[ennum],
+            ":content":topic.passage,
+            ":id":testpaperResult.lastID
+          });
+          topic.readingid = passageResult.lastID
+        }
         let options = item.split(/[A-D]\.\s*/g);
         options = options.splice(1);
         let num = item.match(topicNumReg);
@@ -97,33 +121,40 @@ if(!util.isexits(path_testparper)){
         options = options.splice(1);
         topic.options = topic.options.concat(options);
       }else if(topicPartReg.test(item)){
-        continue;
+        i++;
+        mapData(i);
       }else if(topicDirectionsReg.test(item)){
-        continue;
+        i++;
+        mapData(i);
       }else if(topicAnswerReg.test(item)){
         item = item.replace(topicAnswerReg,"");
         topic.answer = optionsMap[item]
       }else if(topicAnalyzeReg.test(item)){
         topic.analyze = item.replace(topicAnalyzeReg,"")
         formatterTopic.push(topic);
-        topic = {
+        let newTopic = {
           title:"",
           options:[],
           answer:"",
           analyze:"",
-          passagenum:"",
+          testpaperyear:testpaperResult.lastID,
           num:""
         }
+        topic = newTopic
       }else if(topicPassageReg.test(item)){
         topic.passage = item;
       }else{
         topic.title += "\n" + item;
-        topic.passage += "\n" + item;
+        if(topic.passage){
+          topic.passage += "\n" + item;
+        }
       }
-    }
+      i++;
+      mapData(i);
+    })(di)
     return formatterTopic;
   }
-  let formatterTopic = getformatterTopic(testParper.contents);
+  let formatterTopic = await getformatterTopic(testParper.contents);
   console.log(formatterTopic);
   let topicIndex = 0;
   async function inserttopicandanswer(topicIndex){
